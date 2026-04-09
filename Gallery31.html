@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>G31</title>
+    
+    <!-- Configuración para que parezca App -->
+    <link rel="manifest" href="data:application/manifest+json,{'name':'G31','short_name':'G31','start_url':'.','display':'standalone','background_color':'#000000','theme_color':'#ff8fa3'}">
+    
+    <link href="https://fonts.googleapis.com/css2?family=Varela+Round&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --rosa-vibrante: #ff8fa3;
+            --rosa-pastel: #ffb6c1;
+            --pastel-fondo: #fff0f5;
+            --fuente: 'Varela Round', sans-serif;
+        }
+
+        body {
+            margin: 0; padding: 0; font-family: var(--fuente); height: 100dvh;
+            display: flex; flex-direction: column; overflow: hidden;
+            background-color: #000; color: white;
+            user-select: none; -webkit-tap-highlight-color: transparent;
+        }
+
+        #bg-overlay { 
+            position: fixed; inset: 0; z-index: -2; 
+            background-size: cover; background-position: center;
+            filter: blur(35px) brightness(0.4); transform: scale(1.1); 
+            transition: background-image 0.6s ease-in-out; 
+        }
+
+        #loading-overlay {
+            position: fixed; inset: 0; background: var(--pastel-fondo);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 10000; transition: opacity 0.5s; color: #f08080; text-align: center;
+            padding: 20px;
+        }
+
+        .progress-bar-container {
+            width: 90%; max-width: 500px; height: 45px; background: rgba(255,255,255,0.6);
+            border-radius: 25px; margin-top: 25px; overflow: hidden; display: none;
+            border: 3px solid var(--rosa-vibrante);
+        }
+        #progress-fill {
+            height: 100%; width: 0%; background: var(--rosa-vibrante);
+            transition: width 0.3s ease; display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 15px; font-weight: bold;
+        }
+
+        header {
+            position: fixed; top: 0; left: 0; right: 0;
+            padding: 20px; background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent);
+            z-index: 1000; display: flex; align-items: center; justify-content: center;
+            padding-top: env(safe-area-inset-top);
+        }
+
+        .btn-nuevo { background: none; border: none; color: white; font-size: 18px; font-weight: bold; cursor: pointer; }
+        .btn-nuevo.active { color: var(--rosa-vibrante); }
+        .logo-g31 { position: absolute; right: 70px; color: var(--rosa-vibrante); font-size: 24px; font-weight: bold; margin: 0; }
+        .dots-menu { position: absolute; right: 20px; background: none; border: none; color: white; font-size: 30px; cursor: pointer; }
+
+        .main-scroll {
+            flex: 1; overflow-y: scroll; 
+            scroll-snap-type: y mandatory;
+            scroll-behavior: smooth;
+            scrollbar-width: none;
+            -webkit-overflow-scrolling: touch;
+        }
+        .main-scroll::-webkit-scrollbar { display: none; }
+
+        .slide {
+            height: 100dvh; width: 100%; display: flex; align-items: center; justify-content: center;
+            scroll-snap-align: start; scroll-snap-stop: always;
+            position: relative;
+        }
+
+        .media-content { max-width: 100%; max-height: 100%; object-fit: contain; z-index: 1; }
+
+        .side-actions {
+            position: absolute; bottom: 60px; right: 20px;
+            display: flex; flex-direction: column; gap: 20px; z-index: 10;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        .fav-btn {
+            background: var(--rosa-vibrante); border: 2px solid white; color: white;
+            width: 60px; height: 60px; border-radius: 50%; font-size: 28px;
+            cursor: pointer; transition: all 0.2s ease;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        .fav-btn.active { background: white; color: #ff3366; border-color: #ff3366; }
+
+        .empty-msg {
+            text-align: center; padding: 40px; color: var(--rosa-vibrante);
+            font-size: 19px; font-weight: bold; line-height: 1.6;
+            margin: 120px 20px; border: 1px dashed var(--rosa-vibrante); border-radius: 20px;
+        }
+
+        .menu-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.8);
+            display: none; z-index: 2000; align-items: flex-end; justify-content: center;
+            backdrop-filter: blur(5px);
+        }
+        .menu-overlay.open { display: flex; }
+
+        .menu-panel {
+            width: 100%; max-width: 450px; background: var(--pastel-fondo);
+            border-radius: 30px 30px 0 0; padding: 30px;
+            display: flex; flex-direction: column; gap: 15px;
+            padding-bottom: calc(30px + env(safe-area-inset-bottom));
+        }
+
+        .menu-btn {
+            background: var(--rosa-vibrante); border: none; color: white;
+            padding: 16px; border-radius: 18px; font-family: var(--fuente);
+            font-weight: bold; font-size: 17px; text-align: left; cursor: pointer;
+        }
+
+        @media (min-width: 1024px) { .slide { width: 450px; margin: 0 auto; } }
+    </style>
+</head>
+<body>
+
+<div id="loading-overlay">
+    <p id="loading-msg">Abriendo G31...</p>
+    <div class="progress-bar-container" id="p-container">
+        <div id="progress-fill">0%</div>
+    </div>
+</div>
+<div id="bg-overlay"></div>
+
+<header>
+    <button class="btn-nuevo" onclick="setFilter('new')">Nuevo</button>
+    <h1 class="logo-g31">G31</h1>
+    <button class="dots-menu" onclick="toggleMenu(true)">⋮</button>
+</header>
+
+<main class="main-scroll" id="container"></main>
+
+<div id="menu" class="menu-overlay" onclick="toggleMenu(false)">
+    <div class="menu-panel" onclick="event.stopPropagation()">
+        <button class="menu-btn" onclick="setFilter('all')">Ver Todo</button>
+        <button class="menu-btn" onclick="setFilter('image')">Fotos</button>
+        <button class="menu-btn" onclick="setFilter('video')">Videos</button>
+        <button class="menu-btn" onclick="setFilter('fav')">Favoritos</button>
+        <hr style="border: 0; border-top: 2px solid var(--rosa-pastel);">
+        <button class="menu-btn" onclick="document.getElementById('fIn').click()">Importar contenido</button>
+        <input type="file" id="fIn" multiple style="display:none">
+        <button class="menu-btn" style="background: #ff5e7a;" onclick="location.href='https://youtube.com'">PANIC!</button>
+    </div>
+</div>
+
+<script>
+    let db, allMedia = [], filterType = 'all';
+    
+    const casualMessages = ["Un momento...", "Preparando la coleccion...", "Abriendo G31...", "Cargando lo que te gusta..."];
+    const emptyMessages = ["No hay nada aqui todavia. Importa algo para empezar.", "Esta vacio. Sube tus fotos y videos favoritos.", "Parece que aun no has guardado nada.", "La galeria te espera. Sube material para ver."];
+
+    const req = indexedDB.open("G31_App_Final", 1);
+    req.onupgradeneeded = e => { e.target.result.createObjectStore("m", {keyPath: "id", autoIncrement: true}); };
+    req.onsuccess = e => { db = e.target.result; load(); };
+
+    document.getElementById('fIn').onchange = async e => {
+        const files = Array.from(e.target.files);
+        if(files.length === 0) return;
+        const overlay = document.getElementById('loading-overlay');
+        const pBar = document.getElementById('p-container');
+        const pFill = document.getElementById('progress-fill');
+        overlay.style.display = 'flex'; overlay.style.opacity = '1'; pBar.style.display = 'block';
+        document.getElementById('loading-msg').innerText = "Guardando...";
+
+        for (let i = 0; i < files.length; i++) {
+            const perc = Math.round(((i + 1) / files.length) * 100);
+            pFill.style.width = perc + '%';
+            pFill.innerText = `${perc}% (${i+1}/${files.length})`;
+            const tx = db.transaction("m", "readwrite");
+            tx.objectStore("m").add({b: files[i], t: files[i].type.split('/')[0], fv: false, d: Date.now()});
+            await new Promise(r => tx.oncomplete = r);
+        }
+        location.reload();
+    };
+
+    async function load() {
+        document.getElementById('loading-msg').innerText = casualMessages[Math.floor(Math.random()*casualMessages.length)];
+        const tx = db.transaction("m", "readonly");
+        allMedia = await new Promise(r => tx.objectStore("m").getAll().onsuccess = e => r(e.target.result));
+        render();
+        setTimeout(() => { 
+            document.getElementById('loading-overlay').style.opacity = '0';
+            setTimeout(() => document.getElementById('loading-overlay').style.display = 'none', 500);
+        }, 800);
+    }
+
+    function render() {
+        const container = document.getElementById('container'); container.innerHTML = '';
+        let list = allMedia.filter(m => {
+            if (filterType === 'fav') return m.fv;
+            if (filterType === 'image') return m.t === 'image';
+            if (filterType === 'video') return m.t === 'video';
+            if (filterType === 'new') return (Date.now() - m.d) < 86400000;
+            return true;
+        });
+        if (filterType !== 'new') list = list.sort(() => Math.random() - 0.5);
+        if (list.length === 0) {
+            container.innerHTML = `<div class="empty-msg">${emptyMessages[Math.floor(Math.random()*emptyMessages.length)]}</div>`;
+            return;
+        }
+        list.forEach((item) => {
+            const url = URL.createObjectURL(item.b);
+            const slide = document.createElement('div');
+            slide.className = 'slide';
+            slide.innerHTML = `
+                ${item.t === 'video' ? `<video src="${url}" class="media-content" loop muted controls playsinline></video>` : `<img src="${url}" class="media-content">`}
+                <div class="side-actions"><button class="fav-btn ${item.fv ? 'active' : ''}" onclick="toggleFav(this, ${item.id})">♥</button></div>
+            `;
+            container.appendChild(slide);
+        });
+        container.onscroll = () => {
+            const idx = Math.round(container.scrollTop / window.innerHeight);
+            const videos = container.querySelectorAll('video');
+            videos.forEach(v => v.pause());
+            const currentSlide = container.children[idx];
+            if (currentSlide) {
+                const video = currentSlide.querySelector('video');
+                if (video) video.play();
+                document.getElementById('bg-overlay').style.backgroundImage = `url(${currentSlide.querySelector('.media-content').src})`;
+            }
+        };
+        if(list[0]) document.getElementById('bg-overlay').style.backgroundImage = `url(${URL.createObjectURL(list[0].b)})`;
+    }
+
+    async function toggleFav(btn, id) {
+        const tx = db.transaction("m", "readwrite");
+        const store = tx.objectStore("m");
+        const item = await new Promise(r => store.get(id).onsuccess = e => r(e.target.result));
+        item.fv = !item.fv; store.put(item);
+        tx.oncomplete = () => {
+            btn.classList.toggle('active');
+            const mediaObj = allMedia.find(m => m.id === id);
+            if(mediaObj) mediaObj.fv = item.fv;
+            if (filterType === 'fav' && !item.fv) {
+                btn.closest('.slide').style.opacity = '0';
+                setTimeout(() => render(), 300);
+            }
+        };
+    }
+    function setFilter(f) { filterType = f; render(); toggleMenu(false); }
+    function toggleMenu(s) { document.getElementById('menu').classList.toggle('open', s); }
+</script>
+</body>
+</html>
